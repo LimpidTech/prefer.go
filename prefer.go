@@ -1,41 +1,45 @@
 package prefer
 
+import "log"
+
 type filterable func(identifier string) bool
 
 type Configuration struct {
-	identifier  string
-	loaders     map[Loader]filterable
-	serializers map[Serializer]filterable
+	Identifier string
+
+	Loaders     map[Loader]filterable
+	Serializers map[Serializer]SerializerFactory
 }
 
 func Load(identifier string, out interface{}) (*Configuration, error) {
 	configuration := NewConfiguration(identifier)
-	err := configuration.Reload(out)
-	return configuration, err
+	return configuration, configuration.Reload(out)
 }
 
 func NewConfiguration(identifier string) *Configuration {
 	return &Configuration{
-		identifier: identifier,
+		Identifier: identifier,
 	}
 }
 
 func (configuration *Configuration) Reload(out interface{}) error {
-	loader, err := NewLoader(configuration.identifier)
+	loader, err := NewLoader(configuration.Identifier)
 	if err != nil {
 		return err
 	}
 
-	content, err := loader.Load(configuration.identifier)
+	identifier, content, err := loader.Load(configuration.Identifier)
 	if err != nil {
 		return err
 	}
 
-	serializer, err := NewSerializer(configuration.identifier, content)
+	configuration.Identifier = identifier
+	log.Println(configuration.Identifier)
+
+	serializer, err := NewSerializer(identifier, content)
 	if err != nil {
 		return err
 	}
 
-	err = serializer.Deserialize(content, out)
-	return err
+	return serializer.Deserialize(content, out)
 }

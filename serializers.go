@@ -16,6 +16,13 @@ type Serializer interface {
 	Deserialize([]byte, interface{}) error
 }
 
+type JSONSerializer struct{}
+type XMLSerializer struct{}
+
+type SerializerFactory func() Serializer
+
+var defaultSerializers map[string]SerializerFactory
+
 func NewSerializer(identifier string, content []byte) (serializer Serializer, err error) {
 	var extension string
 
@@ -25,17 +32,22 @@ func NewSerializer(identifier string, content []byte) (serializer Serializer, er
 		extension = path.Ext(identifier)
 	}
 
-	switch extension {
-	case ".xml":
-		return XMLSerializer{}, nil
-	case ".json":
-		return JSONSerializer{}, nil
-	default:
+	factory, ok := defaultSerializers[extension]
+
+	if !ok {
 		return nil, errors.New("No matching serializer for " + identifier)
 	}
+
+	return factory(), nil
 }
 
-type JSONSerializer struct{}
+func NewJSONSerializer() Serializer {
+	return JSONSerializer{}
+}
+
+func NewXMLSerializer() Serializer {
+	return XMLSerializer{}
+}
 
 func (this JSONSerializer) Serialize(input interface{}) ([]byte, error) {
 	return json.Marshal(input)
@@ -45,12 +57,17 @@ func (this JSONSerializer) Deserialize(input []byte, obj interface{}) error {
 	return json.Unmarshal(input, &obj)
 }
 
-type XMLSerializer struct{}
-
 func (this XMLSerializer) Serialize(input interface{}) ([]byte, error) {
 	return xml.Marshal(input)
 }
 
 func (this XMLSerializer) Deserialize(input []byte, obj interface{}) error {
 	return xml.Unmarshal(input, &obj)
+}
+
+func init() {
+	defaultSerializers = make(map[string]SerializerFactory)
+
+	defaultSerializers[".json"] = NewJSONSerializer
+	defaultSerializers[".xml"] = NewXMLSerializer
 }
