@@ -1,3 +1,7 @@
+script:
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+
 test:
   post:
     - bash <(curl -s https://codecov.io/bash)
