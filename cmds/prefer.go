@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/monokrome/prefer.go"
+	"github.com/LimpidTech/prefer.go"
 )
 
 type Configuration struct {
