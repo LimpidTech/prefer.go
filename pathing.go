@@ -1,6 +1,7 @@
 package prefer
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -30,7 +31,10 @@ Search:
 
 func init() {
 	wd, err := os.Getwd()
-	check(err)
+
+	if err != nil {
+		log.Fatalln("Could not get current working directory.")
+	}
 
 	// Remove /bin if it's at the end of the cwd
 	// TODO: Er, os.PathSeparator is a rune... So, here's a hack.
