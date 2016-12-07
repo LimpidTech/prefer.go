@@ -8,13 +8,19 @@ type Configuration struct {
 	serializers map[Serializer]filterable
 }
 
+func Load(identifier string, out interface{}) (*Configuration, error) {
+	configuration := NewConfiguration(identifier)
+	err := configuration.Reload(out)
+	return configuration, err
+}
+
 func NewConfiguration(identifier string) *Configuration {
 	return &Configuration{
 		identifier: identifier,
 	}
 }
 
-func (configuration *Configuration) Load(out *interface{}) error {
+func (configuration *Configuration) Reload(out interface{}) error {
 	loader, err := NewLoader(configuration.identifier)
 	if err != nil {
 		return err
