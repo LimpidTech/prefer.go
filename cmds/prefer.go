@@ -7,7 +7,10 @@ import (
 	"github.com/monokrome/prefer.go"
 )
 
-type Configuration struct{}
+type Configuration struct {
+	Name  string `json:"name"`
+	Value int    `json:"value"`
+}
 
 func init() {
 	flag.Parse()
@@ -21,11 +24,10 @@ func main() {
 		log.Fatalln("Command takes one (and only one) argument.")
 	}
 
-	configuration, err := prefer.Load(arguments[0], data)
-
+	channel, err := prefer.Watch(arguments[0], &data)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	log.Println("Loaded configuration at", configuration.Identifier)
+	log.Println(<-channel)
 }

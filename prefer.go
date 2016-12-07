@@ -1,7 +1,5 @@
 package prefer
 
-import "log"
-
 type filterable func(identifier string) bool
 
 type Configuration struct {
@@ -12,8 +10,15 @@ type Configuration struct {
 }
 
 func Load(identifier string, out interface{}) (*Configuration, error) {
+	this := NewConfiguration(identifier)
+	return this, this.Reload(out)
+}
+
+func Watch(identifier string, out interface{}) (chan interface{}, error) {
+	channel := make(chan interface{})
 	configuration := NewConfiguration(identifier)
-	return configuration, configuration.Reload(out)
+	go configuration.Watch(out, channel)
+	return channel, nil
 }
 
 func NewConfiguration(identifier string) *Configuration {
@@ -22,19 +27,18 @@ func NewConfiguration(identifier string) *Configuration {
 	}
 }
 
-func (configuration *Configuration) Reload(out interface{}) error {
-	loader, err := NewLoader(configuration.Identifier)
+func (this *Configuration) Reload(out interface{}) error {
+	loader, err := NewLoader(this.Identifier)
 	if err != nil {
 		return err
 	}
 
-	identifier, content, err := loader.Load(configuration.Identifier)
+	identifier, content, err := loader.Load()
 	if err != nil {
 		return err
 	}
 
-	configuration.Identifier = identifier
-	log.Println(configuration.Identifier)
+	this.Identifier = identifier
 
 	serializer, err := NewSerializer(identifier, content)
 	if err != nil {
@@ -42,4 +46,41 @@ func (configuration *Configuration) Reload(out interface{}) error {
 	}
 
 	return serializer.Deserialize(content, out)
+}
+
+func (this *Configuration) Watch(dest interface{}, channel chan interface{}) error {
+	this.Reload(dest)
+	channel <- dest
+
+	update := make(chan bool)
+	loader, err := NewLoader(this.Identifier)
+
+	if err != nil {
+		return err
+	}
+
+	go loader.Watch(update)
+
+	for {
+		if <-update == true {
+			identifier, content, err := loader.Load()
+			if err != nil {
+				return err
+			}
+
+			serializer, err := NewSerializer(identifier, content)
+			if err != nil {
+				return err
+			}
+
+			err = serializer.Deserialize(content, dest)
+			if err != nil {
+				return err
+			}
+
+			channel <- dest
+		}
+	}
+
+	return err
 }

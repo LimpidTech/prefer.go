@@ -5,20 +5,27 @@ import (
 	"errors"
 	"os"
 	"path"
+
+	"github.com/howeyc/fsnotify"
 )
 
 type Loader interface {
-	Load(identifier string) (string, []byte, error)
+	Load() (string, []byte, error)
+	Watch(channel chan bool) error
 }
 
 func NewLoader(identifier string) (Loader, error) {
 	switch identifier {
 	default:
-		return FileLoader{}, nil
+		return FileLoader{
+			identifier: identifier,
+		}, nil
 	}
 }
 
-type FileLoader struct{}
+type FileLoader struct {
+	identifier string
+}
 
 func checkFileExists(location string) (bool, error) {
 	_, err := os.Stat(location)
@@ -34,10 +41,10 @@ func checkFileExists(location string) (bool, error) {
 	return true, err
 }
 
-func (loader FileLoader) Locate(identifier string) (string, error) {
+func (this FileLoader) Locate() (string, error) {
 	for index := range standardPaths {
 		directory := standardPaths[index]
-		identifierWithPath := path.Join(directory, identifier)
+		identifierWithPath := path.Join(directory, this.identifier)
 
 		if exists, err := checkFileExists(identifierWithPath); exists == true {
 			return identifierWithPath, err
@@ -55,18 +62,19 @@ func (loader FileLoader) Locate(identifier string) (string, error) {
 	return "", errors.New("Could not find a configuration in the given location.")
 }
 
-func (loader FileLoader) Load(identifier string) (string, []byte, error) {
-	location, err := loader.Locate(identifier)
+func (this FileLoader) Load() (string, []byte, error) {
+	location, err := this.Locate()
 
 	if err != nil {
 		return "", nil, err
 	}
+
+	this.identifier = location
 
 	file, err := os.Open(location)
 	if err != nil {
 		return "", nil, err
 	}
-
 	defer file.Close()
 
 	var result []byte
@@ -75,4 +83,27 @@ func (loader FileLoader) Load(identifier string) (string, []byte, error) {
 	}
 
 	return location, result, err
+}
+
+func (this FileLoader) Watch(channel chan bool) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+
+	if err = watcher.Watch(this.identifier); err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-watcher.Event:
+			channel <- true
+		case <-watcher.Error:
+			continue
+		}
+	}
+
+	watcher.Close()
+	return nil
 }
