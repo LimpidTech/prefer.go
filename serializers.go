@@ -1,12 +1,12 @@
 package prefer
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"path"
 
 	"gopkg.in/h2non/filetype.v0"
+	"gopkg.in/yaml.v2"
 )
 
 // NOTE: It may make more sense to use a map to these instead of creating
@@ -16,7 +16,7 @@ type Serializer interface {
 	Deserialize([]byte, interface{}) error
 }
 
-type JSONSerializer struct{}
+type YAMLSerializer struct{}
 type XMLSerializer struct{}
 
 type SerializerFactory func() Serializer
@@ -41,20 +41,20 @@ func NewSerializer(identifier string, content []byte) (serializer Serializer, er
 	return factory(), nil
 }
 
-func NewJSONSerializer() Serializer {
-	return JSONSerializer{}
+func NewYAMLSerializer() Serializer {
+	return YAMLSerializer{}
 }
 
 func NewXMLSerializer() Serializer {
 	return XMLSerializer{}
 }
 
-func (this JSONSerializer) Serialize(input interface{}) ([]byte, error) {
-	return json.Marshal(input)
+func (this YAMLSerializer) Serialize(input interface{}) ([]byte, error) {
+	return yaml.Marshal(input)
 }
 
-func (this JSONSerializer) Deserialize(input []byte, obj interface{}) error {
-	return json.Unmarshal(input, &obj)
+func (this YAMLSerializer) Deserialize(input []byte, obj interface{}) error {
+	return yaml.Unmarshal(input, &obj)
 }
 
 func (this XMLSerializer) Serialize(input interface{}) ([]byte, error) {
@@ -68,6 +68,8 @@ func (this XMLSerializer) Deserialize(input []byte, obj interface{}) error {
 func init() {
 	defaultSerializers = make(map[string]SerializerFactory)
 
-	defaultSerializers[".json"] = NewJSONSerializer
+	defaultSerializers[".json"] = NewYAMLSerializer
+	defaultSerializers[".yml"] = NewYAMLSerializer
+	defaultSerializers[".yaml"] = NewYAMLSerializer
 	defaultSerializers[".xml"] = NewXMLSerializer
 }

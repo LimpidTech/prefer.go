@@ -37,13 +37,13 @@ func getMockSubjectSerialize(t *testing.T, serializer Serializer) []byte {
 	return serialized
 }
 
-func TestNewSerializerReturnsJSONSerializer(t *testing.T) {
-	content := getMockSubjectSerialize(t, JSONSerializer{})
-	serializer, err := NewSerializer("example.json", content)
+func TestNewSerializerReturnsYAMLSerializer(t *testing.T) {
+	content := getMockSubjectSerialize(t, YAMLSerializer{})
+	serializer, err := NewSerializer("example.yaml", content)
 	checkTestError(t, err)
 
-	if reflect.TypeOf(serializer).Name() != "JSONSerializer" {
-		t.Error("Got Serializer of wrong type when requesting JSONSerializer.")
+	if reflect.TypeOf(serializer).Name() != "YAMLSerializer" {
+		t.Error("Got Serializer of wrong type when requesting YAMLSerializer.")
 	}
 }
 
@@ -57,8 +57,8 @@ func TestNewSerializerReturnsXMLSerializer(t *testing.T) {
 	}
 }
 
-func JSONSerializerTestCase(t *testing.T) {
-	serializer := JSONSerializer{}
+func YAMLSerializerTestCase(t *testing.T) {
+	serializer := YAMLSerializer{}
 	serialized := getMockSubjectSerialize(t, serializer)
 
 	result := &MockSubject{}
