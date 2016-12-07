@@ -8,28 +8,14 @@ import (
 
 var standardPaths []string
 
-func StandardPaths() []string {
+func GetStandardPaths() []string {
 	paths := make([]string, len(standardPaths))
 	copy(paths, standardPaths)
 	return paths
 }
 
-func distinct(items []string) (result []string) {
-Search:
-	for _, item := range items {
-		for _, existing := range result {
-			if existing == item {
-				continue Search
-			}
-		}
-
-		result = append(result, item)
-	}
-
-	return result
-}
-
 func init() {
+	pathMap := make(map[string]interface{})
 	wd, err := os.Getwd()
 
 	if err != nil {
@@ -37,7 +23,7 @@ func init() {
 	}
 
 	// Remove /bin if it's at the end of the cwd
-	// TODO: Er, os.PathSeparator is a rune... So, here's a hack.
+	// NOTE: Er, os.PathSeparator is a rune... So, here's a hack.
 	if len(wd) > 4 && wd[len(wd)-4:] == filepath.Join("", "bin") {
 		wd = wd[:len(wd)-4]
 	}
@@ -56,16 +42,14 @@ func init() {
 			path = ""
 		}
 
-		standardPaths = append(standardPaths, filepath.Join(path, "/etc"))
-
-		if path == "" {
-			continue
-		}
+		pathMap[filepath.Join(path, "/etc")] = nil
 
 		if len(path) > 0 {
-			standardPaths = append(standardPaths, path)
+			pathMap[path] = nil
 		}
 	}
 
-	standardPaths = distinct(standardPaths)
+	for path := range pathMap {
+		standardPaths = append(standardPaths, path)
+	}
 }
