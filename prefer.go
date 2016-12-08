@@ -9,15 +9,15 @@ type Configuration struct {
 	Serializers map[Serializer]SerializerFactory
 }
 
-func Load(identifier string, out interface{}) (*Configuration, error) {
+func Load(identifier string, dest interface{}) (*Configuration, error) {
 	this := NewConfiguration(identifier)
-	return this, this.Reload(out)
+	return this, this.Reload(dest)
 }
 
-func Watch(identifier string, out interface{}) (chan interface{}, error) {
+func Watch(identifier string, dest interface{}) (chan interface{}, error) {
 	channel := make(chan interface{})
 	configuration := NewConfiguration(identifier)
-	go configuration.Watch(out, channel)
+	go configuration.Watch(dest, channel)
 	return channel, nil
 }
 
@@ -27,7 +27,7 @@ func NewConfiguration(identifier string) *Configuration {
 	}
 }
 
-func (this *Configuration) Reload(out interface{}) error {
+func (this *Configuration) Reload(dest interface{}) error {
 	loader, err := NewLoader(this.Identifier)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (this *Configuration) Reload(out interface{}) error {
 		return err
 	}
 
-	return serializer.Deserialize(content, out)
+	return serializer.Deserialize(content, dest)
 }
 
 func (this *Configuration) Watch(dest interface{}, channel chan interface{}) error {

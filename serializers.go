@@ -46,7 +46,7 @@ func (this YAMLSerializer) Serialize(input interface{}) ([]byte, error) {
 }
 
 func (this YAMLSerializer) Deserialize(input []byte, obj interface{}) error {
-	return yaml.Unmarshal(input, &obj)
+	return yaml.Unmarshal(input, obj)
 }
 
 func (this XMLSerializer) Serialize(input interface{}) ([]byte, error) {
