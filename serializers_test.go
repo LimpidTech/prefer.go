@@ -7,7 +7,7 @@ import (
 
 const (
 	MOCK_NAME  = "Mock Name"
-	MOCK_VALUE = 12
+	MOCK_VALUE = 30
 )
 
 type MockSubject struct {
@@ -21,8 +21,8 @@ func checkTestError(t *testing.T, err error) {
 	}
 }
 
-func getMockSubject() *MockSubject {
-	return &MockSubject{
+func getMockSubject() MockSubject {
+	return MockSubject{
 		Name:  MOCK_NAME,
 		Value: MOCK_VALUE,
 	}
@@ -57,24 +57,24 @@ func TestNewSerializerReturnsXMLSerializer(t *testing.T) {
 	}
 }
 
-func YAMLSerializerTestCase(t *testing.T) {
+func TestYAMLSerializer(t *testing.T) {
 	serializer := YAMLSerializer{}
 	serialized := getMockSubjectSerialize(t, serializer)
 
-	result := &MockSubject{}
-	checkTestError(t, serializer.Deserialize(serialized, result))
+	result := MockSubject{}
+	checkTestError(t, serializer.Deserialize(serialized, &result))
 
 	if result != getMockSubject() {
 		t.Error("Result does not match original serialized object.")
 	}
 }
 
-func XMLSerializerTestCase(t *testing.T) {
+func TestXMLSerializer(t *testing.T) {
 	serializer := XMLSerializer{}
 	serialized := getMockSubjectSerialize(t, serializer)
 
-	result := &MockSubject{}
-	checkTestError(t, serializer.Deserialize(serialized, result))
+	result := MockSubject{}
+	checkTestError(t, serializer.Deserialize(serialized, &result))
 
 	if result != getMockSubject() {
 		t.Error("Result does not match original serialized object.")
