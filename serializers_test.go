@@ -57,6 +57,15 @@ func TestNewSerializerReturnsXMLSerializer(t *testing.T) {
 	}
 }
 
+func TestNewSerializerReturnsErrorForUnknownFormats(t *testing.T) {
+	content := getMockSubjectSerialize(t, XMLSerializer{})
+	_, err := NewSerializer("example.dat", content)
+
+	if err == nil {
+		t.Error("Expected error, but didn't get one.")
+	}
+}
+
 func TestYAMLSerializer(t *testing.T) {
 	serializer := YAMLSerializer{}
 	serialized := getMockSubjectSerialize(t, serializer)
