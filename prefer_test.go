@@ -27,3 +27,20 @@ func TestLoadCreatesNewConfiguration(t *testing.T) {
 		t.Error("Got unexpected values from configuration file.")
 	}
 }
+
+func TestWatchReturnsChannelForWatchingFileForUpdates(t *testing.T) {
+	type Mock struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	mock := Mock{}
+	channel, err := Watch("share/fixtures/example", &mock)
+	checkTestError(t, err)
+
+	<-channel
+
+	if mock.Name != "Bailey" || mock.Age != 30 {
+		t.Error("Got unexpected values from configuration file.")
+	}
+}

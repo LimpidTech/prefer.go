@@ -4,12 +4,12 @@ import (
 	"flag"
 	"log"
 
-	"github.com/LimpidTech/prefer.go"
+	prefer "../"
 )
 
 type Configuration struct {
-	Name  string `json:"name"`
-	Value int    `json:"value"`
+	Name string `json:"name"`
+	Age  int    `json:"age"`
 }
 
 func init() {
@@ -25,6 +25,7 @@ func main() {
 	}
 
 	channel, err := prefer.Watch(arguments[0], &data)
+
 	if err != nil {
 		log.Fatalln(err)
 	}
