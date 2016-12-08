@@ -12,7 +12,6 @@ func TestLoadCreatesNewConfiguration(t *testing.T) {
 	}
 
 	mock := Mock{}
-
 	configuration, err := Load("share/fixtures/example", &mock)
 	checkTestError(t, err)
 
@@ -25,6 +24,20 @@ func TestLoadCreatesNewConfiguration(t *testing.T) {
 
 	if mock.Name != "Bailey" || mock.Age != 30 {
 		t.Error("Got unexpected values from configuration file.")
+	}
+}
+
+func TestLoadReturnsErrorForFilesWhichDontExist(t *testing.T) {
+	type Mock struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	mock := Mock{}
+	_, err := Load("this/is/a/fake/filename", &mock)
+
+	if err == nil {
+		t.Error("Expected an error but one was not returned.")
 	}
 }
 
