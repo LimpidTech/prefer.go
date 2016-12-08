@@ -42,8 +42,10 @@ func checkFileExists(location string) (bool, error) {
 }
 
 func (this FileLoader) Locate() (string, error) {
-	for index := range standardPaths {
-		directory := standardPaths[index]
+	paths := GetStandardPaths()
+
+	for index := range paths {
+		directory := paths[index]
 		identifierWithPath := path.Join(directory, this.identifier)
 
 		if exists, err := checkFileExists(identifierWithPath); exists == true {
