@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	prefer "../"
+	prefer "github.com/LimpidTech/prefer.go"
 )
 
 type Configuration struct {
