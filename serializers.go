@@ -5,7 +5,6 @@ import (
 	"errors"
 	"path"
 
-	"gopkg.in/h2non/filetype.v0"
 	"gopkg.in/yaml.v2"
 )
 
@@ -24,14 +23,7 @@ type SerializerFactory func() Serializer
 var defaultSerializers map[string]SerializerFactory
 
 func NewSerializer(identifier string, content []byte) (serializer Serializer, err error) {
-	var extension string
-
-	if kind, unknown := filetype.Match(content); err == nil && unknown == nil && kind.Extension != "unknown" {
-		extension = kind.Extension
-	} else {
-		extension = path.Ext(identifier)
-	}
-
+	extension := path.Ext(identifier)
 	factory, ok := defaultSerializers[extension]
 
 	if !ok {
