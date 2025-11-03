@@ -81,6 +81,4 @@ func (this *Configuration) Watch(dest interface{}, channel chan interface{}) err
 			channel <- dest
 		}
 	}
-
-	return err
 }

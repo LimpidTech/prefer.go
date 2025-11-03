@@ -5,7 +5,7 @@ import (
 	"errors"
 	"path"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // NOTE: It may make more sense to use a map to these instead of creating

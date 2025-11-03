@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/howeyc/fsnotify"
+	"github.com/fsnotify/fsnotify"
 )
 
 type Loader interface {
@@ -92,20 +92,18 @@ func (this FileLoader) Watch(channel chan bool) error {
 	if err != nil {
 		return err
 	}
+	defer watcher.Close()
 
-	if err = watcher.Watch(this.identifier); err != nil {
+	if err = watcher.Add(this.identifier); err != nil {
 		return err
 	}
 
 	for {
 		select {
-		case <-watcher.Event:
+		case <-watcher.Events:
 			channel <- true
-		case <-watcher.Error:
+		case <-watcher.Errors:
 			continue
 		}
 	}
-
-	watcher.Close()
-	return nil
 }
