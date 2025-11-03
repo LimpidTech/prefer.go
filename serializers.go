@@ -1,10 +1,14 @@
 package prefer
 
 import (
+	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"path"
+	"reflect"
 
+	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,6 +21,7 @@ type Serializer interface {
 
 type YAMLSerializer struct{}
 type XMLSerializer struct{}
+type INISerializer struct{}
 
 type SerializerFactory func() Serializer
 
@@ -41,6 +46,10 @@ func NewXMLSerializer() Serializer {
 	return XMLSerializer{}
 }
 
+func NewINISerializer() Serializer {
+	return INISerializer{}
+}
+
 func (this YAMLSerializer) Serialize(input interface{}) ([]byte, error) {
 	return yaml.Marshal(input)
 }
@@ -57,6 +66,45 @@ func (this XMLSerializer) Deserialize(input []byte, obj interface{}) error {
 	return xml.Unmarshal(input, &obj)
 }
 
+func (this INISerializer) Serialize(input interface{}) ([]byte, error) {
+	cfg := ini.Empty()
+	v := reflect.ValueOf(input)
+	t := reflect.TypeOf(input)
+	
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+		
+		var strValue string
+		switch value.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			strValue = fmt.Sprintf("%d", value.Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			strValue = fmt.Sprintf("%d", value.Uint())
+		case reflect.Float32, reflect.Float64:
+			strValue = fmt.Sprintf("%g", value.Float())
+		case reflect.Bool:
+			strValue = fmt.Sprintf("%t", value.Bool())
+		default:
+			strValue = value.String()
+		}
+		
+		cfg.Section("").Key(field.Name).SetValue(strValue)
+	}
+	
+	var buf bytes.Buffer
+	_, err := cfg.WriteTo(&buf)
+	return buf.Bytes(), err
+}
+
+func (this INISerializer) Deserialize(input []byte, obj interface{}) error {
+	cfg, err := ini.Load(input)
+	if err != nil {
+		return err
+	}
+	return cfg.MapTo(obj)
+}
+
 func init() {
 	defaultSerializers = make(map[string]SerializerFactory)
 
@@ -64,4 +112,5 @@ func init() {
 	defaultSerializers[".yml"] = NewYAMLSerializer
 	defaultSerializers[".yaml"] = NewYAMLSerializer
 	defaultSerializers[".xml"] = NewXMLSerializer
+	defaultSerializers[".ini"] = NewINISerializer
 }

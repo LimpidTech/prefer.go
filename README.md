@@ -87,6 +87,7 @@ func main() {
 - YAML (`.yaml`, `.yml`)
 - JSON (`.json`)
 - XML (`.xml`)
+- INI (`.ini`)
 
 ## Standard Search Paths
 

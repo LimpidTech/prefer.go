@@ -57,6 +57,16 @@ func TestNewSerializerReturnsXMLSerializer(t *testing.T) {
 	}
 }
 
+func TestNewSerializerReturnsINISerializer(t *testing.T) {
+	content := getMockSubjectSerialize(t, INISerializer{})
+	serializer, err := NewSerializer("example.ini", content)
+	checkTestError(t, err)
+
+	if reflect.TypeOf(serializer).Name() != "INISerializer" {
+		t.Error("Got Serializer of wrong type when requesting INISerializer.")
+	}
+}
+
 func TestNewSerializerReturnsErrorForUnknownFormats(t *testing.T) {
 	content := getMockSubjectSerialize(t, XMLSerializer{})
 	_, err := NewSerializer("example.dat", content)
@@ -80,6 +90,18 @@ func TestYAMLSerializer(t *testing.T) {
 
 func TestXMLSerializer(t *testing.T) {
 	serializer := XMLSerializer{}
+	serialized := getMockSubjectSerialize(t, serializer)
+
+	result := MockSubject{}
+	checkTestError(t, serializer.Deserialize(serialized, &result))
+
+	if result != getMockSubject() {
+		t.Error("Result does not match original serialized object.")
+	}
+}
+
+func TestINISerializer(t *testing.T) {
+	serializer := INISerializer{}
 	serialized := getMockSubjectSerialize(t, serializer)
 
 	result := MockSubject{}
