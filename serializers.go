@@ -8,6 +8,7 @@ import (
 	"path"
 	"reflect"
 
+	"github.com/yosuke-furukawa/json5/encoding/json5"
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v3"
 )
@@ -22,6 +23,7 @@ type Serializer interface {
 type YAMLSerializer struct{}
 type XMLSerializer struct{}
 type INISerializer struct{}
+type JSONSerializer struct{}
 
 type SerializerFactory func() Serializer
 
@@ -48,6 +50,10 @@ func NewXMLSerializer() Serializer {
 
 func NewINISerializer() Serializer {
 	return INISerializer{}
+}
+
+func NewJSONSerializer() Serializer {
+	return JSONSerializer{}
 }
 
 func (this YAMLSerializer) Serialize(input interface{}) ([]byte, error) {
@@ -105,10 +111,18 @@ func (this INISerializer) Deserialize(input []byte, obj interface{}) error {
 	return cfg.MapTo(obj)
 }
 
+func (this JSONSerializer) Serialize(input interface{}) ([]byte, error) {
+	return json5.Marshal(input)
+}
+
+func (this JSONSerializer) Deserialize(input []byte, obj interface{}) error {
+	return json5.Unmarshal(input, obj)
+}
+
 func init() {
 	defaultSerializers = make(map[string]SerializerFactory)
 
-	defaultSerializers[".json"] = NewYAMLSerializer
+	defaultSerializers[".json"] = NewJSONSerializer
 	defaultSerializers[".yml"] = NewYAMLSerializer
 	defaultSerializers[".yaml"] = NewYAMLSerializer
 	defaultSerializers[".xml"] = NewXMLSerializer

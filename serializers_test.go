@@ -111,3 +111,25 @@ func TestINISerializer(t *testing.T) {
 		t.Error("Result does not match original serialized object.")
 	}
 }
+
+func TestNewSerializerReturnsJSONSerializer(t *testing.T) {
+	content := getMockSubjectSerialize(t, JSONSerializer{})
+	serializer, err := NewSerializer("example.json", content)
+	checkTestError(t, err)
+
+	if reflect.TypeOf(serializer).Name() != "JSONSerializer" {
+		t.Error("Got Serializer of wrong type when requesting JSONSerializer.")
+	}
+}
+
+func TestJSON5Serializer(t *testing.T) {
+	serializer := JSONSerializer{}
+	serialized := getMockSubjectSerialize(t, serializer)
+
+	result := MockSubject{}
+	checkTestError(t, serializer.Deserialize(serialized, &result))
+
+	if result != getMockSubject() {
+		t.Error("Result does not match original serialized object.")
+	}
+}

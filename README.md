@@ -1,7 +1,9 @@
 prefer.go
 =========
 
-[![CircleCI](https://circleci.com/gh/LimpidTech/prefer.go.svg?style=svg)](https://circleci.com/gh/LimpidTech/prefer.go)
+[![Test](https://github.com/LimpidTech/prefer.go/actions/workflows/test.yml/badge.svg)](https://github.com/LimpidTech/prefer.go/actions/workflows/test.yml)
+[![Lint](https://github.com/LimpidTech/prefer.go/actions/workflows/lint.yml/badge.svg)](https://github.com/LimpidTech/prefer.go/actions/workflows/lint.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/LimpidTech/prefer.go)](https://goreportcard.com/report/github.com/LimpidTech/prefer.go)
 [![codecov](https://codecov.io/gh/LimpidTech/prefer.go/branch/master/graph/badge.svg)](https://codecov.io/gh/LimpidTech/prefer.go)
 
 Powerful configuration management in Go

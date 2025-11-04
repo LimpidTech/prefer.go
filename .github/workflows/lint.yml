@@ -10,6 +10,7 @@ jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    environment: build
     steps:
     - uses: actions/checkout@v4
     
