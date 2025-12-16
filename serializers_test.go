@@ -165,3 +165,43 @@ func TestNewSerializerReturnsJSONSerializerForJSON5(t *testing.T) {
 		t.Error("Got Serializer of wrong type when requesting JSONSerializer for .json5 file.")
 	}
 }
+
+// Test INI serializer with various numeric types
+type MockININumericTypes struct {
+	UintVal   uint   `ini:"uint_val"`
+	Uint8Val  uint8  `ini:"uint8_val"`
+	FloatVal  float32 `ini:"float_val"`
+	Float64Val float64 `ini:"float64_val"`
+	BoolVal   bool   `ini:"bool_val"`
+}
+
+func TestINISerializerWithNumericTypes(t *testing.T) {
+	serializer := INISerializer{}
+	subject := MockININumericTypes{
+		UintVal:   42,
+		Uint8Val:  8,
+		FloatVal:  3.14,
+		Float64Val: 2.71828,
+		BoolVal:   true,
+	}
+
+	serialized, err := serializer.Serialize(subject)
+	checkTestError(t, err)
+
+	if len(serialized) == 0 {
+		t.Error("Expected non-empty serialized output")
+	}
+}
+
+func TestINISerializerDeserializeInvalidINI(t *testing.T) {
+	serializer := INISerializer{}
+
+	// Invalid INI content (not valid key=value format)
+	invalidINI := []byte("[section\nkey")
+
+	result := MockSubject{}
+	err := serializer.Deserialize(invalidINI, &result)
+	if err == nil {
+		t.Error("Expected error for invalid INI content")
+	}
+}

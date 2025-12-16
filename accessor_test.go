@@ -397,3 +397,66 @@ func TestConfigMapGetFloatWithInt64(t *testing.T) {
 		t.Error("Expected to get int64 value as float64")
 	}
 }
+
+func TestConfigMapGetFloatNonexistent(t *testing.T) {
+	cm := NewConfigMap(nil)
+
+	_, ok := cm.GetFloat("nonexistent")
+	if ok {
+		t.Error("Expected false for non-existent key")
+	}
+}
+
+func TestConfigMapGetBoolNonexistent(t *testing.T) {
+	cm := NewConfigMap(nil)
+
+	_, ok := cm.GetBool("nonexistent")
+	if ok {
+		t.Error("Expected false for non-existent key")
+	}
+}
+
+func TestConfigMapGetSliceNonexistent(t *testing.T) {
+	cm := NewConfigMap(nil)
+
+	_, ok := cm.GetSlice("nonexistent")
+	if ok {
+		t.Error("Expected false for non-existent key")
+	}
+}
+
+func TestConfigMapGetMapNonexistent(t *testing.T) {
+	cm := NewConfigMap(nil)
+
+	_, ok := cm.GetMap("nonexistent")
+	if ok {
+		t.Error("Expected false for non-existent key")
+	}
+}
+
+func TestConfigMapSetThroughExistingMap(t *testing.T) {
+	// Test setting a nested value when the intermediate map already exists
+	data := map[string]interface{}{
+		"database": map[string]interface{}{
+			"host": "localhost",
+		},
+	}
+	cm := NewConfigMap(data)
+
+	// Set a new key in an existing nested map
+	err := cm.Set("database.port", 5432)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	port, ok := cm.GetInt("database.port")
+	if !ok || port != 5432 {
+		t.Error("Expected database.port to be 5432")
+	}
+
+	// Verify the existing value is still there
+	host, ok := cm.GetString("database.host")
+	if !ok || host != "localhost" {
+		t.Error("Expected database.host to still be 'localhost'")
+	}
+}
