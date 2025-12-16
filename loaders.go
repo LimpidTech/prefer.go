@@ -12,6 +12,7 @@ import (
 type Loader interface {
 	Load() (string, []byte, error)
 	Watch(channel chan bool) error
+	WatchWithContext(channel chan bool, done <-chan struct{}) error
 }
 
 func NewLoader(identifier string) (Loader, error) {
@@ -42,6 +43,20 @@ func checkFileExists(location string) (bool, error) {
 }
 
 func (this FileLoader) Locate() (string, error) {
+	// Check if identifier is already an absolute path that exists
+	if path.IsAbs(this.identifier) {
+		if exists, err := checkFileExists(this.identifier); exists {
+			return this.identifier, err
+		}
+		// Try with extensions
+		for extension := range defaultSerializers {
+			identifierWithExtension := this.identifier + extension
+			if exists, err := checkFileExists(identifierWithExtension); exists {
+				return identifierWithExtension, err
+			}
+		}
+	}
+
 	paths := GetStandardPaths()
 
 	for index := range paths {
@@ -87,23 +102,76 @@ func (this FileLoader) Load() (string, []byte, error) {
 	return location, result, err
 }
 
+// WatchEvent represents a file system event during watching
+type WatchEvent struct {
+	Path  string
+	Error error
+}
+
 func (this FileLoader) Watch(channel chan bool) error {
+	return this.WatchWithContext(channel, nil)
+}
+
+// WatchWithContext watches for file changes with support for graceful shutdown.
+// Close the done channel to stop watching.
+func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{}) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
-	defer watcher.Close()
 
-	if err = watcher.Add(this.identifier); err != nil {
+	// Locate the file first to get the full path
+	location, err := this.Locate()
+	if err != nil {
+		watcher.Close()
 		return err
 	}
 
-	for {
-		select {
-		case <-watcher.Events:
-			channel <- true
-		case <-watcher.Errors:
-			continue
-		}
+	if err = watcher.Add(location); err != nil {
+		watcher.Close()
+		return err
 	}
+
+	go func() {
+		defer watcher.Close()
+		for {
+			if done != nil {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					// Only notify on write/create events, like JS and Rust implementations
+					if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
+						channel <- true
+					}
+				case _, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					// Continue watching on errors (resilient like Rust)
+					continue
+				case <-done:
+					return
+				}
+			} else {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
+						channel <- true
+					}
+				case _, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					continue
+				}
+			}
+		}
+	}()
+
+	return nil
 }
