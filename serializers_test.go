@@ -133,3 +133,35 @@ func TestJSON5Serializer(t *testing.T) {
 		t.Error("Result does not match original serialized object.")
 	}
 }
+
+func TestNewSerializerReturnsTOMLSerializer(t *testing.T) {
+	content := getMockSubjectSerialize(t, TOMLSerializer{})
+	serializer, err := NewSerializer("example.toml", content)
+	checkTestError(t, err)
+
+	if reflect.TypeOf(serializer).Name() != "TOMLSerializer" {
+		t.Error("Got Serializer of wrong type when requesting TOMLSerializer.")
+	}
+}
+
+func TestTOMLSerializer(t *testing.T) {
+	serializer := TOMLSerializer{}
+	serialized := getMockSubjectSerialize(t, serializer)
+
+	result := MockSubject{}
+	checkTestError(t, serializer.Deserialize(serialized, &result))
+
+	if result != getMockSubject() {
+		t.Error("Result does not match original serialized object.")
+	}
+}
+
+func TestNewSerializerReturnsJSONSerializerForJSON5(t *testing.T) {
+	content := getMockSubjectSerialize(t, JSONSerializer{})
+	serializer, err := NewSerializer("example.json5", content)
+	checkTestError(t, err)
+
+	if reflect.TypeOf(serializer).Name() != "JSONSerializer" {
+		t.Error("Got Serializer of wrong type when requesting JSONSerializer for .json5 file.")
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"path"
 	"reflect"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/yosuke-furukawa/json5/encoding/json5"
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v3"
@@ -24,6 +25,7 @@ type YAMLSerializer struct{}
 type XMLSerializer struct{}
 type INISerializer struct{}
 type JSONSerializer struct{}
+type TOMLSerializer struct{}
 
 type SerializerFactory func() Serializer
 
@@ -54,6 +56,10 @@ func NewINISerializer() Serializer {
 
 func NewJSONSerializer() Serializer {
 	return JSONSerializer{}
+}
+
+func NewTOMLSerializer() Serializer {
+	return TOMLSerializer{}
 }
 
 func (this YAMLSerializer) Serialize(input interface{}) ([]byte, error) {
@@ -119,12 +125,22 @@ func (this JSONSerializer) Deserialize(input []byte, obj interface{}) error {
 	return json5.Unmarshal(input, obj)
 }
 
+func (this TOMLSerializer) Serialize(input interface{}) ([]byte, error) {
+	return toml.Marshal(input)
+}
+
+func (this TOMLSerializer) Deserialize(input []byte, obj interface{}) error {
+	return toml.Unmarshal(input, obj)
+}
+
 func init() {
 	defaultSerializers = make(map[string]SerializerFactory)
 
 	defaultSerializers[".json"] = NewJSONSerializer
+	defaultSerializers[".json5"] = NewJSONSerializer
 	defaultSerializers[".yml"] = NewYAMLSerializer
 	defaultSerializers[".yaml"] = NewYAMLSerializer
 	defaultSerializers[".xml"] = NewXMLSerializer
 	defaultSerializers[".ini"] = NewINISerializer
+	defaultSerializers[".toml"] = NewTOMLSerializer
 }
