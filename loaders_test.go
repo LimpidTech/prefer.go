@@ -1,11 +1,14 @@
 package prefer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func TestFileLoaderLocatesFilesWithExtensions(t *testing.T) {
@@ -286,5 +289,366 @@ func TestFileLoaderWatchWithContextNilDone(t *testing.T) {
 		// Success - received update notification
 	case <-time.After(2 * time.Second):
 		t.Error("Timed out waiting for file change notification")
+	}
+}
+
+func TestNewLoaderWithEmptyIdentifier(t *testing.T) {
+	_, err := NewLoader("")
+	if err == nil {
+		t.Error("Expected error for empty identifier")
+	}
+}
+
+func TestCheckFileExistsWithStatError(t *testing.T) {
+	// Save original statFunc and restore after test
+	originalStatFunc := statFunc
+	defer func() { statFunc = originalStatFunc }()
+
+	// Mock statFunc to return a non-IsNotExist error
+	statFunc = func(name string) (os.FileInfo, error) {
+		return nil, errors.New("permission denied")
+	}
+
+	exists, err := checkFileExists("/some/path")
+	if !exists {
+		t.Error("Expected exists to be true when stat returns non-IsNotExist error")
+	}
+	if err == nil {
+		t.Error("Expected error to be returned")
+	}
+	if err.Error() != "permission denied" {
+		t.Error("Expected 'permission denied' error, got:", err.Error())
+	}
+}
+
+// mockWatcher implements the Watcher interface for testing
+type mockWatcher struct {
+	events     chan fsnotify.Event
+	errors     chan error
+	addErr     error
+	closeErr   error
+	closeCalls int
+}
+
+func newMockWatcher() *mockWatcher {
+	return &mockWatcher{
+		events: make(chan fsnotify.Event, 10),
+		errors: make(chan error, 10),
+	}
+}
+
+func (m *mockWatcher) Add(name string) error     { return m.addErr }
+func (m *mockWatcher) Close() error              { m.closeCalls++; return m.closeErr }
+func (m *mockWatcher) Events() <-chan fsnotify.Event { return m.events }
+func (m *mockWatcher) Errors() <-chan error      { return m.errors }
+
+func TestWatchWithContextEventsChannelClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+	done := make(chan struct{})
+
+	err := loader.WatchWithContext(channel, done)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the events channel to trigger the !ok branch
+	close(mock.events)
+
+	// Give the goroutine time to exit
+	time.Sleep(50 * time.Millisecond)
+
+	// The watcher should have been closed
+	if mock.closeCalls == 0 {
+		t.Error("Expected watcher to be closed")
+	}
+}
+
+func TestWatchWithContextErrorsChannelClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+	done := make(chan struct{})
+
+	err := loader.WatchWithContext(channel, done)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the errors channel to trigger the !ok branch
+	close(mock.errors)
+
+	// Give the goroutine time to exit
+	time.Sleep(50 * time.Millisecond)
+
+	// The watcher should have been closed
+	if mock.closeCalls == 0 {
+		t.Error("Expected watcher to be closed")
+	}
+}
+
+func TestWatchWithContextReceivesError(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+	done := make(chan struct{})
+
+	err := loader.WatchWithContext(channel, done)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Send an error - should be ignored (resilient watching)
+	mock.errors <- errors.New("some error")
+
+	// Give it time to process
+	time.Sleep(50 * time.Millisecond)
+
+	// Send a valid event - should still work
+	mock.events <- fsnotify.Event{Name: tmpFile, Op: fsnotify.Write}
+
+	select {
+	case <-channel:
+		// Success - watcher continued after error
+	case <-time.After(500 * time.Millisecond):
+		t.Error("Watcher should continue after error")
+	}
+
+	close(done)
+}
+
+func TestWatchWithContextNewWatcherError(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	newWatcher = func() (Watcher, error) {
+		return nil, errors.New("failed to create watcher")
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+
+	err := loader.WatchWithContext(channel, nil)
+	if err == nil {
+		t.Error("Expected error when newWatcher fails")
+	}
+}
+
+func TestWatchWithContextAddError(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	mock.addErr = errors.New("failed to add watch")
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+
+	err := loader.WatchWithContext(channel, nil)
+	if err == nil {
+		t.Error("Expected error when Add fails")
+	}
+	if mock.closeCalls == 0 {
+		t.Error("Expected watcher to be closed on Add error")
+	}
+}
+
+func TestWatchWithContextNilDoneEventsChannelClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+
+	// Watch with nil done channel
+	err := loader.WatchWithContext(channel, nil)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the events channel to trigger the !ok branch in the nil done path
+	close(mock.events)
+
+	// Give the goroutine time to exit
+	time.Sleep(50 * time.Millisecond)
+
+	if mock.closeCalls == 0 {
+		t.Error("Expected watcher to be closed")
+	}
+}
+
+func TestWatchWithContextNilDoneErrorsChannelClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+
+	// Watch with nil done channel
+	err := loader.WatchWithContext(channel, nil)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the errors channel to trigger the !ok branch in the nil done path
+	close(mock.errors)
+
+	// Give the goroutine time to exit
+	time.Sleep(50 * time.Millisecond)
+
+	if mock.closeCalls == 0 {
+		t.Error("Expected watcher to be closed")
+	}
+}
+
+func TestWatchWithContextNilDoneReceivesError(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := newMockWatcher()
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	loader := FileLoader{identifier: tmpFile}
+	channel := make(chan bool, 1)
+
+	// Watch with nil done channel
+	err := loader.WatchWithContext(channel, nil)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Send an error - should be ignored (resilient watching)
+	mock.errors <- errors.New("some error")
+
+	// Give it time to process
+	time.Sleep(50 * time.Millisecond)
+
+	// Send a valid event - should still work
+	mock.events <- fsnotify.Event{Name: tmpFile, Op: fsnotify.Write}
+
+	select {
+	case <-channel:
+		// Success - watcher continued after error
+	case <-time.After(500 * time.Millisecond):
+		t.Error("Watcher should continue after error")
 	}
 }

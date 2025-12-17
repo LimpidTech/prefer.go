@@ -15,13 +15,46 @@ type Loader interface {
 	WatchWithContext(channel chan bool, done <-chan struct{}) error
 }
 
-func NewLoader(identifier string) (Loader, error) {
-	switch identifier {
-	default:
-		return FileLoader{
-			identifier: identifier,
-		}, nil
+// Watcher interface abstracts fsnotify.Watcher for testing
+type Watcher interface {
+	Add(name string) error
+	Close() error
+	Events() <-chan fsnotify.Event
+	Errors() <-chan error
+}
+
+// fsnotifyWatcher wraps fsnotify.Watcher to implement our Watcher interface
+type fsnotifyWatcher struct {
+	w *fsnotify.Watcher
+}
+
+func (f *fsnotifyWatcher) Add(name string) error     { return f.w.Add(name) }
+func (f *fsnotifyWatcher) Close() error              { return f.w.Close() }
+func (f *fsnotifyWatcher) Events() <-chan fsnotify.Event { return f.w.Events }
+func (f *fsnotifyWatcher) Errors() <-chan error      { return f.w.Errors }
+
+// WatcherFactory creates new Watcher instances
+type WatcherFactory func() (Watcher, error)
+
+// Default watcher factory using fsnotify
+var newWatcher WatcherFactory = func() (Watcher, error) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
 	}
+	return &fsnotifyWatcher{w: w}, nil
+}
+
+// statFunc is used for dependency injection in tests
+var statFunc = os.Stat
+
+func NewLoader(identifier string) (Loader, error) {
+	if identifier == "" {
+		return nil, errors.New("identifier cannot be empty")
+	}
+	return FileLoader{
+		identifier: identifier,
+	}, nil
 }
 
 type FileLoader struct {
@@ -29,7 +62,7 @@ type FileLoader struct {
 }
 
 func checkFileExists(location string) (bool, error) {
-	_, err := os.Stat(location)
+	_, err := statFunc(location)
 
 	if err == nil {
 		return true, err
@@ -115,7 +148,7 @@ func (this FileLoader) Watch(channel chan bool) error {
 // WatchWithContext watches for file changes with support for graceful shutdown.
 // Close the done channel to stop watching.
 func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{}) error {
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := newWatcher()
 	if err != nil {
 		return err
 	}
@@ -137,7 +170,7 @@ func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{})
 		for {
 			if done != nil {
 				select {
-				case event, ok := <-watcher.Events:
+				case event, ok := <-watcher.Events():
 					if !ok {
 						return
 					}
@@ -145,7 +178,7 @@ func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{})
 					if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 						channel <- true
 					}
-				case _, ok := <-watcher.Errors:
+				case _, ok := <-watcher.Errors():
 					if !ok {
 						return
 					}
@@ -156,14 +189,14 @@ func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{})
 				}
 			} else {
 				select {
-				case event, ok := <-watcher.Events:
+				case event, ok := <-watcher.Events():
 					if !ok {
 						return
 					}
 					if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 						channel <- true
 					}
-				case _, ok := <-watcher.Errors:
+				case _, ok := <-watcher.Errors():
 					if !ok {
 						return
 					}

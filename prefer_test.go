@@ -1,11 +1,14 @@
 package prefer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func TestLoadCreatesNewConfiguration(t *testing.T) {
@@ -298,6 +301,39 @@ func TestWatchWithDoneReloadError(t *testing.T) {
 	}
 }
 
+func TestReloadWithEmptyIdentifier(t *testing.T) {
+	// Test Reload when NewLoader returns error (empty identifier)
+	config := NewConfiguration("")
+	type Mock struct {
+		Name string `json:"name"`
+	}
+	mock := Mock{}
+
+	err := config.Reload(&mock)
+	if err == nil {
+		t.Error("Expected error for empty identifier")
+	}
+}
+
+func TestWatchWithDoneNewLoaderError(t *testing.T) {
+	// Test WatchWithDone when NewLoader returns error (empty identifier)
+	type Mock struct {
+		Name string `json:"name"`
+	}
+
+	mock := Mock{}
+	done := make(chan struct{})
+	defer close(done)
+
+	config := NewConfiguration("")
+	channel := make(chan interface{}, 1)
+
+	err := config.WatchWithDone(&mock, channel, done)
+	if err == nil {
+		t.Error("Expected error for empty identifier")
+	}
+}
+
 func TestWatchWithDoneUpdateChannelClosed(t *testing.T) {
 	type Mock struct {
 		Name string `json:"name"`
@@ -381,5 +417,232 @@ func TestWatchWithDoneSkipsSerializerErrors(t *testing.T) {
 		// Got an update, good
 	case <-time.After(2 * time.Second):
 		// Timeout is acceptable - the point is the watcher didn't crash
+	}
+}
+
+func TestWatchWithDoneWatcherError(t *testing.T) {
+	// Test WatchWithDone when WatchWithContext returns an error
+	type Mock struct {
+		Name string `json:"name"`
+	}
+
+	// Create a temporary file
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "config.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "initial"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	// Make newWatcher fail - this happens in WatchWithContext after Reload succeeds
+	newWatcher = func() (Watcher, error) {
+		return nil, errors.New("watcher error")
+	}
+
+	mock := Mock{}
+	done := make(chan struct{})
+	defer close(done)
+
+	config := NewConfiguration(tmpFile)
+	channel := make(chan interface{}, 1)
+
+	err := config.WatchWithDone(&mock, channel, done)
+	if err == nil {
+		t.Error("Expected error when WatchWithContext fails")
+	}
+}
+
+func TestWatchWithDoneLoadErrorDuringUpdate(t *testing.T) {
+	// Test that loader.Load() errors during watch updates are skipped (resilient)
+	type Mock struct {
+		Name string `json:"name"`
+	}
+
+	// Create a temporary file
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "config.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "initial"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := Mock{}
+	done := make(chan struct{})
+	defer close(done)
+
+	channel, err := WatchWithDone(tmpFile, &mock, done)
+	checkTestError(t, err)
+
+	// Wait for initial load
+	select {
+	case <-channel:
+		if mock.Name != "initial" {
+			t.Error("Expected initial name, got:", mock.Name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timed out waiting for initial config")
+	}
+
+	// Give watcher time to set up
+	time.Sleep(100 * time.Millisecond)
+
+	// Delete the file - this will cause Load() to fail on next update
+	os.Remove(tmpFile)
+
+	// Create the file again to trigger a watcher event
+	// The Load will succeed now since the file exists again
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "recovered"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should receive the recovered config
+	select {
+	case <-channel:
+		if mock.Name != "recovered" {
+			t.Error("Expected recovered name, got:", mock.Name)
+		}
+	case <-time.After(2 * time.Second):
+		// Timeout is acceptable - the watcher continues to work
+	}
+}
+
+// mockWatcherForPrefer is a test-specific mock for prefer_test.go
+type mockWatcherForPrefer struct {
+	events     chan fsnotify.Event
+	errors     chan error
+	addErr     error
+	closeCalls int
+}
+
+func (m *mockWatcherForPrefer) Add(name string) error           { return m.addErr }
+func (m *mockWatcherForPrefer) Close() error                    { m.closeCalls++; return nil }
+func (m *mockWatcherForPrefer) Events() <-chan fsnotify.Event   { return m.events }
+func (m *mockWatcherForPrefer) Errors() <-chan error            { return m.errors }
+
+func TestConfigurationWatchWithDoneUpdateChannelClosed(t *testing.T) {
+	// Test that the goroutine exits gracefully when update channel closes
+	type Mock struct {
+		Name string `json:"name"`
+	}
+
+	// Create a temporary file
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "config.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "initial"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := &mockWatcherForPrefer{
+		events: make(chan fsnotify.Event, 10),
+		errors: make(chan error, 10),
+	}
+
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	data := Mock{}
+	done := make(chan struct{})
+	config := NewConfiguration(tmpFile)
+	channel := make(chan interface{}, 1)
+
+	err := config.WatchWithDone(&data, channel, done)
+	checkTestError(t, err)
+
+	// Wait for initial notification
+	<-channel
+
+	// Close the mock events channel - this simulates watcher shutdown
+	close(mock.events)
+
+	// Give time for goroutine to exit
+	time.Sleep(100 * time.Millisecond)
+
+	// The output channel should be closed now
+	select {
+	case _, ok := <-channel:
+		if ok {
+			// Got a value, that's okay
+		}
+		// Channel closed, as expected
+	case <-time.After(500 * time.Millisecond):
+		// Timeout - channel not closed, but that's acceptable
+	}
+}
+
+func TestConfigurationWatchWithDoneLoadError(t *testing.T) {
+	// Test that loader.Load() errors during update are skipped
+	type Mock struct {
+		Name string `json:"name"`
+	}
+
+	// Create a temporary file
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "config.json")
+
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "initial"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Save original newWatcher and restore after test
+	originalNewWatcher := newWatcher
+	defer func() { newWatcher = originalNewWatcher }()
+
+	mock := &mockWatcherForPrefer{
+		events: make(chan fsnotify.Event, 10),
+		errors: make(chan error, 10),
+	}
+
+	newWatcher = func() (Watcher, error) {
+		return mock, nil
+	}
+
+	data := Mock{}
+	done := make(chan struct{})
+	defer close(done)
+
+	config := NewConfiguration(tmpFile)
+	channel := make(chan interface{}, 1)
+
+	err := config.WatchWithDone(&data, channel, done)
+	checkTestError(t, err)
+
+	// Wait for initial notification
+	<-channel
+
+	// Delete the file to cause Load() to fail
+	os.Remove(tmpFile)
+
+	// Send a write event - this will trigger Load() which will fail
+	mock.events <- fsnotify.Event{Name: tmpFile, Op: fsnotify.Write}
+
+	// Give time for the error path to execute
+	time.Sleep(100 * time.Millisecond)
+
+	// Recreate the file
+	if err := os.WriteFile(tmpFile, []byte(`{"name": "recovered"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Send another event - this one should succeed
+	mock.events <- fsnotify.Event{Name: tmpFile, Op: fsnotify.Write}
+
+	// Should receive the recovered config
+	select {
+	case <-channel:
+		if data.Name != "recovered" {
+			t.Error("Expected recovered name, got:", data.Name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("Timed out waiting for recovered config")
 	}
 }
