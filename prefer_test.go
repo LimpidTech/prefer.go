@@ -449,13 +449,13 @@ func TestWatchWithDoneWatcherError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	// Make newWatcher fail - this happens in WatchWithContext after Reload succeeds
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return nil, errors.New("watcher error")
-	}
+	})
 
 	mock := Mock{}
 	done := make(chan struct{})
@@ -555,17 +555,17 @@ func TestConfigurationWatchWithDoneUpdateChannelClosed(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := &mockWatcherForPrefer{
 		events: make(chan fsnotify.Event, 10),
 		errors: make(chan error, 10),
 	}
 
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	data := Mock{}
 	done := make(chan struct{})
@@ -608,17 +608,17 @@ func TestConfigurationWatchWithDoneLoadError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := &mockWatcherForPrefer{
 		events: make(chan fsnotify.Event, 10),
 		errors: make(chan error, 10),
 	}
 
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	data := Mock{}
 	done := make(chan struct{})

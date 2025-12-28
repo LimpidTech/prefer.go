@@ -355,13 +355,13 @@ func TestWatchWithContextEventsChannelClosed(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -396,13 +396,13 @@ func TestWatchWithContextErrorsChannelClosed(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -437,13 +437,13 @@ func TestWatchWithContextReceivesError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -485,12 +485,12 @@ func TestWatchWithContextNewWatcherError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return nil, errors.New("failed to create watcher")
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -510,14 +510,14 @@ func TestWatchWithContextAddError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
 	mock.addErr = errors.New("failed to add watch")
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -540,13 +540,13 @@ func TestWatchWithContextNilDoneEventsChannelClosed(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -580,13 +580,13 @@ func TestWatchWithContextNilDoneErrorsChannelClosed(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)
@@ -620,13 +620,13 @@ func TestWatchWithContextNilDoneReceivesError(t *testing.T) {
 	}
 
 	// Save original newWatcher and restore after test
-	originalNewWatcher := newWatcher
-	defer func() { newWatcher = originalNewWatcher }()
+	originalNewWatcher := getWatcher()
+	defer setWatcher(originalNewWatcher)
 
 	mock := newMockWatcher()
-	newWatcher = func() (Watcher, error) {
+	setWatcher(func() (Watcher, error) {
 		return mock, nil
-	}
+	})
 
 	loader := FileLoader{identifier: tmpFile}
 	channel := make(chan bool, 1)

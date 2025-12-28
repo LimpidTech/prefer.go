@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -36,6 +37,9 @@ func (f *fsnotifyWatcher) Errors() <-chan error      { return f.w.Errors }
 // WatcherFactory creates new Watcher instances
 type WatcherFactory func() (Watcher, error)
 
+// watcherMu protects newWatcher from concurrent access during tests
+var watcherMu sync.RWMutex
+
 // Default watcher factory using fsnotify
 var newWatcher WatcherFactory = func() (Watcher, error) {
 	w, err := fsnotify.NewWatcher()
@@ -43,6 +47,20 @@ var newWatcher WatcherFactory = func() (Watcher, error) {
 		return nil, err
 	}
 	return &fsnotifyWatcher{w: w}, nil
+}
+
+// getWatcher safely retrieves the current watcher factory
+func getWatcher() WatcherFactory {
+	watcherMu.RLock()
+	defer watcherMu.RUnlock()
+	return newWatcher
+}
+
+// setWatcher safely sets the watcher factory (for testing)
+func setWatcher(w WatcherFactory) {
+	watcherMu.Lock()
+	defer watcherMu.Unlock()
+	newWatcher = w
 }
 
 // statFunc is used for dependency injection in tests
@@ -148,7 +166,7 @@ func (this FileLoader) Watch(channel chan bool) error {
 // WatchWithContext watches for file changes with support for graceful shutdown.
 // Close the done channel to stop watching.
 func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{}) error {
-	watcher, err := newWatcher()
+	watcher, err := getWatcher()()
 	if err != nil {
 		return err
 	}
