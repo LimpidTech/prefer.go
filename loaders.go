@@ -96,14 +96,14 @@ func (this FileLoader) Locate() (string, error) {
 		directory := paths[index]
 		identifierWithPath := path.Join(directory, this.identifier)
 
-		if exists, err := checkFileExists(identifierWithPath); exists == true {
+		if exists, err := checkFileExists(identifierWithPath); exists {
 			return identifierWithPath, err
 		}
 
 		for extension := range defaultSerializers {
 			identifierWithExtension := identifierWithPath + extension
 
-			if exists, err := checkFileExists(identifierWithExtension); exists == true {
+			if exists, err := checkFileExists(identifierWithExtension); exists {
 				return identifierWithExtension, err
 			}
 		}

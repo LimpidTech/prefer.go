@@ -38,7 +38,9 @@ func Watch(identifier string, dest interface{}, opts ...Option) (chan interface{
 func WatchWithDone(identifier string, dest interface{}, done <-chan struct{}, opts ...Option) (chan interface{}, error) {
 	channel := make(chan interface{})
 	configuration := NewConfiguration(identifier, opts...)
-	go configuration.WatchWithDone(dest, channel, done)
+	go func() {
+		_ = configuration.WatchWithDone(dest, channel, done)
+	}()
 	return channel, nil
 }
 

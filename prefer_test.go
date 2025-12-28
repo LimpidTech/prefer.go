@@ -416,16 +416,16 @@ func TestWatchWithDoneSkipsSerializerErrors(t *testing.T) {
 
 	// Rename file to an unsupported extension to trigger NewSerializer error
 	newFile := filepath.Join(tmpDir, "config.unsupported")
-	os.Rename(tmpFile, newFile)
+	_ = os.Rename(tmpFile, newFile)
 
 	// Write to trigger a watch event (even though it won't be picked up properly)
-	os.WriteFile(tmpFile, []byte(`{"name": "updated"}`), 0644)
+	_ = os.WriteFile(tmpFile, []byte(`{"name": "updated"}`), 0644)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// The watcher should continue running without crashing
 	// Write valid JSON again
-	os.WriteFile(tmpFile, []byte(`{"name": "recovered"}`), 0644)
+	_ = os.WriteFile(tmpFile, []byte(`{"name": "recovered"}`), 0644)
 
 	// Should eventually receive an update
 	select {

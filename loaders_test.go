@@ -249,7 +249,7 @@ func TestFileLoaderLoadUnreadableFile(t *testing.T) {
 	if err := os.WriteFile(tmpFile, []byte(`{}`), 0000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(tmpFile, 0644) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(tmpFile, 0644) }() // Restore permissions for cleanup
 
 	loader := FileLoader{identifier: tmpFile}
 	_, _, err := loader.Load()

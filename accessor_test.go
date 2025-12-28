@@ -236,7 +236,7 @@ func TestConfigMapSet(t *testing.T) {
 	}
 
 	// Set on non-map should error
-	cm.Set("scalar", "value")
+	_ = cm.Set("scalar", "value")
 	err = cm.Set("scalar.nested", "value")
 	if err == nil {
 		t.Error("Expected error when setting nested key on scalar")
