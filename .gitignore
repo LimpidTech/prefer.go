@@ -21,3 +21,4 @@ _*.go
 # Non-git hidden files
 .*
 !.git*
+coverage.out

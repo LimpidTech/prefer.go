@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -327,7 +328,7 @@ type mockWatcher struct {
 	errors     chan error
 	addErr     error
 	closeErr   error
-	closeCalls int
+	closeCalls atomic.Int32
 }
 
 func newMockWatcher() *mockWatcher {
@@ -337,10 +338,13 @@ func newMockWatcher() *mockWatcher {
 	}
 }
 
-func (m *mockWatcher) Add(name string) error     { return m.addErr }
-func (m *mockWatcher) Close() error              { m.closeCalls++; return m.closeErr }
+func (m *mockWatcher) Add(name string) error { return m.addErr }
+func (m *mockWatcher) Close() error {
+	m.closeCalls.Add(1)
+	return m.closeErr
+}
 func (m *mockWatcher) Events() <-chan fsnotify.Event { return m.events }
-func (m *mockWatcher) Errors() <-chan error      { return m.errors }
+func (m *mockWatcher) Errors() <-chan error          { return m.errors }
 
 func TestWatchWithContextEventsChannelClosed(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -378,7 +382,7 @@ func TestWatchWithContextEventsChannelClosed(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// The watcher should have been closed
-	if mock.closeCalls == 0 {
+	if mock.closeCalls.Load() == 0 {
 		t.Error("Expected watcher to be closed")
 	}
 }
@@ -419,7 +423,7 @@ func TestWatchWithContextErrorsChannelClosed(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// The watcher should have been closed
-	if mock.closeCalls == 0 {
+	if mock.closeCalls.Load() == 0 {
 		t.Error("Expected watcher to be closed")
 	}
 }
@@ -522,7 +526,7 @@ func TestWatchWithContextAddError(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when Add fails")
 	}
-	if mock.closeCalls == 0 {
+	if mock.closeCalls.Load() == 0 {
 		t.Error("Expected watcher to be closed on Add error")
 	}
 }
@@ -562,7 +566,7 @@ func TestWatchWithContextNilDoneEventsChannelClosed(t *testing.T) {
 	// Give the goroutine time to exit
 	time.Sleep(50 * time.Millisecond)
 
-	if mock.closeCalls == 0 {
+	if mock.closeCalls.Load() == 0 {
 		t.Error("Expected watcher to be closed")
 	}
 }
@@ -602,7 +606,7 @@ func TestWatchWithContextNilDoneErrorsChannelClosed(t *testing.T) {
 	// Give the goroutine time to exit
 	time.Sleep(50 * time.Millisecond)
 
-	if mock.closeCalls == 0 {
+	if mock.closeCalls.Load() == 0 {
 		t.Error("Expected watcher to be closed")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -126,7 +127,6 @@ func TestWatchWithDoneDetectsFileChanges(t *testing.T) {
 
 	mock := Mock{}
 	done := make(chan struct{})
-	defer close(done)
 
 	channel, err := WatchWithDone(tmpFile, &mock, done)
 	checkTestError(t, err)
@@ -134,11 +134,15 @@ func TestWatchWithDoneDetectsFileChanges(t *testing.T) {
 	// Wait for initial load
 	select {
 	case <-channel:
-		if mock.Name != "initial" {
-			t.Error("Expected initial name, got:", mock.Name)
-		}
+		// Initial load complete
 	case <-time.After(2 * time.Second):
+		close(done)
 		t.Fatal("Timed out waiting for initial config")
+	}
+
+	if mock.Name != "initial" {
+		close(done)
+		t.Fatal("Expected initial name, got:", mock.Name)
 	}
 
 	// Give watcher time to set up
@@ -147,16 +151,22 @@ func TestWatchWithDoneDetectsFileChanges(t *testing.T) {
 	// Update the file
 	newContent := `{"name": "updated"}`
 	if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
+		close(done)
 		t.Fatal(err)
 	}
 
 	// Wait for update notification
 	select {
 	case <-channel:
+		// Stop the watcher and wait for goroutine to exit (channel close)
+		close(done)
+		for range channel {
+		} // drain until closed
 		if mock.Name != "updated" {
 			t.Error("Expected updated name, got:", mock.Name)
 		}
 	case <-time.After(2 * time.Second):
+		close(done)
 		t.Error("Timed out waiting for config update")
 	}
 }
@@ -177,7 +187,6 @@ func TestWatchWithDoneSkipsInvalidUpdates(t *testing.T) {
 
 	mock := Mock{}
 	done := make(chan struct{})
-	defer close(done)
 
 	channel, err := WatchWithDone(tmpFile, &mock, done)
 	checkTestError(t, err)
@@ -190,6 +199,7 @@ func TestWatchWithDoneSkipsInvalidUpdates(t *testing.T) {
 
 	// Write invalid JSON - should be skipped, not crash
 	if err := os.WriteFile(tmpFile, []byte(`{invalid json}`), 0644); err != nil {
+		close(done)
 		t.Fatal(err)
 	}
 
@@ -198,16 +208,22 @@ func TestWatchWithDoneSkipsInvalidUpdates(t *testing.T) {
 
 	// Write valid JSON again
 	if err := os.WriteFile(tmpFile, []byte(`{"name": "recovered"}`), 0644); err != nil {
+		close(done)
 		t.Fatal(err)
 	}
 
 	// Should receive the valid update
 	select {
 	case <-channel:
+		// Stop the watcher and wait for goroutine to exit (channel close)
+		close(done)
+		for range channel {
+		} // drain until closed
 		if mock.Name != "recovered" {
 			t.Error("Expected recovered name, got:", mock.Name)
 		}
 	case <-time.After(2 * time.Second):
+		close(done)
 		t.Error("Timed out waiting for recovered config")
 	}
 }
@@ -515,13 +531,16 @@ type mockWatcherForPrefer struct {
 	events     chan fsnotify.Event
 	errors     chan error
 	addErr     error
-	closeCalls int
+	closeCalls atomic.Int32
 }
 
-func (m *mockWatcherForPrefer) Add(name string) error           { return m.addErr }
-func (m *mockWatcherForPrefer) Close() error                    { m.closeCalls++; return nil }
-func (m *mockWatcherForPrefer) Events() <-chan fsnotify.Event   { return m.events }
-func (m *mockWatcherForPrefer) Errors() <-chan error            { return m.errors }
+func (m *mockWatcherForPrefer) Add(name string) error { return m.addErr }
+func (m *mockWatcherForPrefer) Close() error {
+	m.closeCalls.Add(1)
+	return nil
+}
+func (m *mockWatcherForPrefer) Events() <-chan fsnotify.Event { return m.events }
+func (m *mockWatcherForPrefer) Errors() <-chan error          { return m.errors }
 
 func TestConfigurationWatchWithDoneUpdateChannelClosed(t *testing.T) {
 	// Test that the goroutine exits gracefully when update channel closes
