@@ -208,3 +208,32 @@ func (this FileLoader) WatchWithContext(channel chan bool, done <-chan struct{})
 
 	return nil
 }
+
+// MemoryLoader loads configuration from in-memory content.
+// Useful for testing and embedding configurations.
+type MemoryLoader struct {
+	identifier string
+	content    []byte
+}
+
+// NewMemoryLoader creates a loader that returns the given content.
+// The identifier is used for format detection (e.g., "config.json" for JSON).
+func NewMemoryLoader(identifier string, content []byte) *MemoryLoader {
+	return &MemoryLoader{
+		identifier: identifier,
+		content:    content,
+	}
+}
+
+func (m *MemoryLoader) Load() (string, []byte, error) {
+	return m.identifier, m.content, nil
+}
+
+func (m *MemoryLoader) Watch(channel chan bool) error {
+	// Memory loaders don't support watching - content is static
+	return errors.New("MemoryLoader does not support watching")
+}
+
+func (m *MemoryLoader) WatchWithContext(channel chan bool, done <-chan struct{}) error {
+	return errors.New("MemoryLoader does not support watching")
+}

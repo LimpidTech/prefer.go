@@ -665,3 +665,58 @@ func TestConfigurationWatchWithDoneLoadError(t *testing.T) {
 		t.Error("Timed out waiting for recovered config")
 	}
 }
+
+func TestLoadWithCustomLoader(t *testing.T) {
+	type Config struct {
+		Name string `json:"name"`
+	}
+
+	content := []byte(`{"name": "from memory"}`)
+	loader := NewMemoryLoader("config.json", content)
+
+	var config Config
+	_, err := Load("unused", &config, WithLoader(loader))
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	if config.Name != "from memory" {
+		t.Error("Expected 'from memory', got:", config.Name)
+	}
+}
+
+func TestLoadWithCustomLoaderYAML(t *testing.T) {
+	type Config struct {
+		Database struct {
+			Host string `yaml:"host"`
+			Port int    `yaml:"port"`
+		} `yaml:"database"`
+	}
+
+	content := []byte(`database:
+  host: localhost
+  port: 5432`)
+	loader := NewMemoryLoader("config.yaml", content)
+
+	var config Config
+	_, err := Load("unused", &config, WithLoader(loader))
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	if config.Database.Host != "localhost" {
+		t.Error("Expected 'localhost', got:", config.Database.Host)
+	}
+	if config.Database.Port != 5432 {
+		t.Error("Expected 5432, got:", config.Database.Port)
+	}
+}
+
+func TestNewConfigurationWithOptions(t *testing.T) {
+	loader := NewMemoryLoader("test.json", []byte(`{}`))
+	config := NewConfiguration("test", WithLoader(loader))
+
+	if config.loader != loader {
+		t.Error("Expected custom loader to be set")
+	}
+}

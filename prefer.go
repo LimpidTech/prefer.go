@@ -2,41 +2,65 @@ package prefer
 
 type filterable func(identifier string) bool
 
+// Option configures how configuration is loaded
+type Option func(*Configuration)
+
+// WithLoader sets a custom loader for the configuration
+func WithLoader(loader Loader) Option {
+	return func(c *Configuration) {
+		c.loader = loader
+	}
+}
+
 type Configuration struct {
 	Identifier string
 
+	loader      Loader
 	Loaders     map[Loader]filterable
 	Serializers map[Serializer]SerializerFactory
 }
 
-func Load(identifier string, dest interface{}) (*Configuration, error) {
-	this := NewConfiguration(identifier)
+// Load loads configuration from the given identifier into dest.
+// Options can be used to customize loading behavior, e.g., WithLoader.
+func Load(identifier string, dest interface{}, opts ...Option) (*Configuration, error) {
+	this := NewConfiguration(identifier, opts...)
 	return this, this.Reload(dest)
 }
 
-func Watch(identifier string, dest interface{}) (chan interface{}, error) {
-	return WatchWithDone(identifier, dest, nil)
+// Watch watches for configuration changes and returns a channel that receives
+// updated configuration values.
+func Watch(identifier string, dest interface{}, opts ...Option) (chan interface{}, error) {
+	return WatchWithDone(identifier, dest, nil, opts...)
 }
 
 // WatchWithDone watches a configuration file with support for graceful shutdown.
 // Close the done channel to stop watching.
-func WatchWithDone(identifier string, dest interface{}, done <-chan struct{}) (chan interface{}, error) {
+func WatchWithDone(identifier string, dest interface{}, done <-chan struct{}, opts ...Option) (chan interface{}, error) {
 	channel := make(chan interface{})
-	configuration := NewConfiguration(identifier)
+	configuration := NewConfiguration(identifier, opts...)
 	go configuration.WatchWithDone(dest, channel, done)
 	return channel, nil
 }
 
-func NewConfiguration(identifier string) *Configuration {
-	return &Configuration{
+// NewConfiguration creates a new Configuration with the given identifier and options.
+func NewConfiguration(identifier string, opts ...Option) *Configuration {
+	c := &Configuration{
 		Identifier: identifier,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (this *Configuration) Reload(dest interface{}) error {
-	loader, err := NewLoader(this.Identifier)
-	if err != nil {
-		return err
+	loader := this.loader
+	if loader == nil {
+		var err error
+		loader, err = NewLoader(this.Identifier)
+		if err != nil {
+			return err
+		}
 	}
 
 	identifier, content, err := loader.Load()
@@ -68,10 +92,13 @@ func (this *Configuration) WatchWithDone(dest interface{}, channel chan interfac
 	channel <- dest
 
 	update := make(chan bool)
-	loader, err := NewLoader(this.Identifier)
-
-	if err != nil {
-		return err
+	loader := this.loader
+	if loader == nil {
+		var err error
+		loader, err = NewLoader(this.Identifier)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := loader.WatchWithContext(update, done); err != nil {

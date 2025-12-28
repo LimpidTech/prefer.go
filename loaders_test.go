@@ -656,3 +656,42 @@ func TestWatchWithContextNilDoneReceivesError(t *testing.T) {
 		t.Error("Watcher should continue after error")
 	}
 }
+
+func TestMemoryLoaderLoad(t *testing.T) {
+	content := []byte(`{"name": "test"}`)
+	loader := NewMemoryLoader("config.json", content)
+
+	identifier, data, err := loader.Load()
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	if identifier != "config.json" {
+		t.Error("Expected identifier 'config.json', got:", identifier)
+	}
+
+	if string(data) != string(content) {
+		t.Error("Content mismatch")
+	}
+}
+
+func TestMemoryLoaderWatchReturnsError(t *testing.T) {
+	loader := NewMemoryLoader("config.json", []byte(`{}`))
+
+	channel := make(chan bool)
+	err := loader.Watch(channel)
+	if err == nil {
+		t.Error("Expected error from MemoryLoader.Watch")
+	}
+}
+
+func TestMemoryLoaderWatchWithContextReturnsError(t *testing.T) {
+	loader := NewMemoryLoader("config.json", []byte(`{}`))
+
+	channel := make(chan bool)
+	done := make(chan struct{})
+	err := loader.WatchWithContext(channel, done)
+	if err == nil {
+		t.Error("Expected error from MemoryLoader.WatchWithContext")
+	}
+}
