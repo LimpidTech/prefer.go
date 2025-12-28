@@ -17,7 +17,7 @@ func TestFileLoaderLocatesFilesWithExtensions(t *testing.T) {
 	loader, err := NewLoader(pathName)
 	checkTestError(t, err)
 
-	identifier, _, err := loader.Load()
+	identifier, _, _ := loader.Load()
 	if strings.HasSuffix(identifier, pathName) != true {
 		t.Error("Unexpected result from Load()")
 	}
@@ -28,7 +28,7 @@ func TestFileLoaderLocatesFilesWithoutExtensions(t *testing.T) {
 	loader, err := NewLoader(pathName)
 	checkTestError(t, err)
 
-	identifier, _, err := loader.Load()
+	identifier, _, _ := loader.Load()
 	if strings.HasSuffix(identifier, pathName+".yaml") != true {
 		t.Error("Unexpected result from Load()")
 	}

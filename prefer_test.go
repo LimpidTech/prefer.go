@@ -379,10 +379,8 @@ func TestWatchWithDoneUpdateChannelClosed(t *testing.T) {
 
 	// Channel should be closed
 	select {
-	case _, ok := <-channel:
-		if ok {
-			// Still open, that's okay for this test
-		}
+	case <-channel:
+		// Got a value or channel closed
 	case <-time.After(500 * time.Millisecond):
 		// Timeout is fine
 	}
@@ -588,11 +586,8 @@ func TestConfigurationWatchWithDoneUpdateChannelClosed(t *testing.T) {
 
 	// The output channel should be closed now
 	select {
-	case _, ok := <-channel:
-		if ok {
-			// Got a value, that's okay
-		}
-		// Channel closed, as expected
+	case <-channel:
+		// Got a value or channel closed, as expected
 	case <-time.After(500 * time.Millisecond):
 		// Timeout - channel not closed, but that's acceptable
 	}
