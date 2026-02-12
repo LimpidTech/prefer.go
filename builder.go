@@ -74,9 +74,9 @@ func (b *ConfigBuilder) AddOptionalFile(identifier string) *ConfigBuilder {
 
 // AddEnv adds environment variables with the given prefix.
 // Variables are converted to nested structure using the separator.
-// Example: MYAPP_DATABASE_HOST with prefix "MYAPP" becomes database.host
+// Example: MYAPP__DATABASE__HOST with prefix "MYAPP" becomes database.host
 func (b *ConfigBuilder) AddEnv(prefix string) *ConfigBuilder {
-	return b.AddSource(&EnvSource{prefix: prefix, separator: "_"})
+	return b.AddSource(&EnvSource{prefix: prefix, separator: "__"})
 }
 
 // AddEnvWithSeparator adds environment variables with a custom separator.
@@ -153,9 +153,9 @@ type EnvSource struct {
 	separator string
 }
 
-// NewEnvSource creates a new EnvSource with the default separator "_".
+// NewEnvSource creates a new EnvSource with the default separator "__".
 func NewEnvSource(prefix string) *EnvSource {
-	return &EnvSource{prefix: prefix, separator: "_"}
+	return &EnvSource{prefix: prefix, separator: "__"}
 }
 
 // NewEnvSourceWithSeparator creates an EnvSource with a custom separator.

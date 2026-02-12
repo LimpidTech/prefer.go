@@ -154,13 +154,13 @@ func TestConfigBuilderWithOptionalFileMissing(t *testing.T) {
 
 func TestConfigBuilderWithEnv(t *testing.T) {
 	// Set test env vars
-	os.Setenv("TESTAPP_DATABASE_HOST", "envhost")
-	os.Setenv("TESTAPP_DATABASE_PORT", "9999")
-	os.Setenv("TESTAPP_DEBUG", "true")
+	os.Setenv("TESTAPP__DATABASE__HOST", "envhost")
+	os.Setenv("TESTAPP__DATABASE__PORT", "9999")
+	os.Setenv("TESTAPP__DEBUG", "true")
 	defer func() {
-		os.Unsetenv("TESTAPP_DATABASE_HOST")
-		os.Unsetenv("TESTAPP_DATABASE_PORT")
-		os.Unsetenv("TESTAPP_DEBUG")
+		os.Unsetenv("TESTAPP__DATABASE__HOST")
+		os.Unsetenv("TESTAPP__DATABASE__PORT")
+		os.Unsetenv("TESTAPP__DEBUG")
 	}()
 
 	config, err := NewConfigBuilder().
@@ -188,11 +188,11 @@ func TestConfigBuilderWithEnv(t *testing.T) {
 }
 
 func TestEnvSourceLoad(t *testing.T) {
-	os.Setenv("TEST_DB_HOST", "localhost")
-	os.Setenv("TEST_DB_PORT", "5432")
+	os.Setenv("TEST__DB__HOST", "localhost")
+	os.Setenv("TEST__DB__PORT", "5432")
 	defer func() {
-		os.Unsetenv("TEST_DB_HOST")
-		os.Unsetenv("TEST_DB_PORT")
+		os.Unsetenv("TEST__DB__HOST")
+		os.Unsetenv("TEST__DB__PORT")
 	}()
 
 	source := NewEnvSource("TEST")
@@ -288,11 +288,11 @@ func TestSetNestedOverwritesNonMap(t *testing.T) {
 }
 
 func TestAddEnvWithSeparator(t *testing.T) {
-	os.Setenv("APP__DB__HOST", "localhost")
-	defer os.Unsetenv("APP__DB__HOST")
+	os.Setenv("APP-DB-HOST", "localhost")
+	defer os.Unsetenv("APP-DB-HOST")
 
 	config, err := NewConfigBuilder().
-		AddEnvWithSeparator("APP", "__").
+		AddEnvWithSeparator("APP", "-").
 		Build()
 
 	if err != nil {
@@ -306,10 +306,10 @@ func TestAddEnvWithSeparator(t *testing.T) {
 }
 
 func TestNewEnvSourceWithSeparator(t *testing.T) {
-	os.Setenv("TEST2__A__B", "value")
-	defer os.Unsetenv("TEST2__A__B")
+	os.Setenv("TEST2-A-B", "value")
+	defer os.Unsetenv("TEST2-A-B")
 
-	source := NewEnvSourceWithSeparator("TEST2", "__")
+	source := NewEnvSourceWithSeparator("TEST2", "-")
 	data, err := source.Load()
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
